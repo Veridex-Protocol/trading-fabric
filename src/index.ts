@@ -148,6 +148,40 @@ export function createTradingFabric(
         trade_date,
         asset_type,
         past_context: input.past_context,
+      }).catch(async (err) => {
+        // Persist a partial artifact on failure so the captured events
+        // (analyst reports, debate turns, etc.) survive process exit and
+        // can be inspected via `trading-fabric replay <runId>` or by
+        // opening the JSON file directly.
+        if (options.persistRuns) {
+          const reports = events
+            .filter((e): e is Extract<OrchestrationEvent, { type: 'analyst_completed' }> =>
+              e.type === 'analyst_completed',
+            )
+            .map((e) => e.report);
+          const runStarted = events.find(
+            (e): e is Extract<OrchestrationEvent, { type: 'run_started' }> =>
+              e.type === 'run_started',
+          );
+          const partial: TradingFabricRunResult = {
+            ...emptyRunResult({ ...input, trade_date, asset_type, analysts }),
+            ...(runStarted ? { runId: runStarted.runId } : {}),
+            reports,
+            error: err instanceof Error ? err.message : String(err),
+          };
+          try {
+            const artifact = createRunArtifact({
+              version: VERSION,
+              input,
+              result: partial,
+              events,
+            });
+            await writeRunArtifact({ config: runConfig, artifact });
+          } catch {
+            // Persistence is best-effort on the failure path.
+          }
+        }
+        throw err;
       });
 
       if (options.persistRuns) {

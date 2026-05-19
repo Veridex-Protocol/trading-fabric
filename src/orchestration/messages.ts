@@ -134,6 +134,38 @@ export function bearResearcherUserMessage(args: {
 const JSON_INSTRUCTION =
   'Respond with **only** a single JSON object matching the schema described in the system prompt. Do not wrap it in code fences, prose, or commentary — emit raw JSON.';
 
+// Per-agent JSON shape examples. Models (especially Gemini) honor
+// structured-output requirements far more reliably when the exact field
+// names, ordering, and allowed enum values are shown verbatim in the
+// user message rather than inferred from prose.
+const RESEARCH_PLAN_SHAPE =
+  'Required JSON shape (emit exactly these keys, in this order):\n' +
+  '{\n' +
+  '  "recommendation": "Buy" | "Overweight" | "Hold" | "Underweight" | "Sell",\n' +
+  '  "rationale": "<conversational summary ending with which arguments drove the recommendation>",\n' +
+  '  "strategic_actions": "<concrete steps for the trader, including position sizing>"\n' +
+  '}';
+
+const TRADER_PROPOSAL_SHAPE =
+  'Required JSON shape (emit exactly these keys; optional keys may be null but must be present):\n' +
+  '{\n' +
+  '  "action": "Buy" | "Hold" | "Sell",\n' +
+  '  "reasoning": "<2-4 sentences grounded in the analyst reports and research plan>",\n' +
+  '  "entry_price": <number | null>,\n' +
+  '  "stop_loss": <number | null>,\n' +
+  '  "position_sizing": "<string | null>"\n' +
+  '}';
+
+const PORTFOLIO_DECISION_SHAPE =
+  'Required JSON shape (emit exactly these keys; optional keys may be null but must be present):\n' +
+  '{\n' +
+  '  "rating": "Buy" | "Overweight" | "Hold" | "Underweight" | "Sell",\n' +
+  '  "executive_summary": "<2-4 sentence action plan: entry, sizing, key risk levels, time horizon>",\n' +
+  '  "investment_thesis": "<detailed reasoning anchored in specific evidence from the risk debate>",\n' +
+  '  "price_target": <number | null>,\n' +
+  '  "time_horizon": "<string | null, e.g. \'3-6 months\'>"\n' +
+  '}';
+
 export function researchManagerUserMessage(args: {
   ticker: Ticker;
   trade_date: TradeDate;
@@ -153,6 +185,8 @@ export function researchManagerUserMessage(args: {
     debateHistoryBlock(args.history),
     '',
     JSON_INSTRUCTION,
+    '',
+    RESEARCH_PLAN_SHAPE,
   ].join('\n');
 }
 
@@ -175,6 +209,8 @@ export function traderUserMessage(args: {
     args.research_plan_markdown,
     '',
     JSON_INSTRUCTION,
+    '',
+    TRADER_PROPOSAL_SHAPE,
   ].join('\n');
 }
 
@@ -264,5 +300,7 @@ export function portfolioManagerUserMessage(args: {
     past,
     '',
     JSON_INSTRUCTION,
+    '',
+    PORTFOLIO_DECISION_SHAPE,
   ].join('\n');
 }

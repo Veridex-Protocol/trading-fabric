@@ -22,6 +22,7 @@ import { parsePolicyConfigText, validatePolicyConfig } from '../policy/config.js
 import { createDefaultRuntimeOptions, defaultApprovalDir } from '../runtime.js';
 import { runTradingEvalSuite, type TradingEvalSuiteId } from '../evals/index.js';
 import { createTuiEventSink, renderTradingFabricTui } from '../tui/index.js';
+import { loadDotenvFromCwd } from './dotenv.js';
 
 export interface BuildProgramOptions {
   env?: NodeJS.ProcessEnv;
@@ -79,6 +80,11 @@ const PROVIDER_KEYS = [
 ] as const satisfies readonly LLMProviderKey[];
 
 export function buildProgram(cli: BuildProgramOptions = {}): Command {
+  // Auto-load `.env` from cwd only when no explicit env is injected,
+  // so tests and library embedders see a pristine environment.
+  if (!cli.env) {
+    loadDotenvFromCwd();
+  }
   const env = cli.env ?? process.env;
   const stdout = cli.stdout ?? ((text: string) => process.stdout.write(text));
   const program = new Command();
@@ -129,6 +135,15 @@ export function buildProgram(cli: BuildProgramOptions = {}): Command {
         else stdout(`Run ${result.runId} completed for ${result.ticker}\n`);
       } catch (err) {
         view?.unmount();
+        // `persistRuns: true` saves a partial artifact even when the
+        // orchestrator throws — tell the user where to find it so they
+        // can inspect analyst reports captured before the failure.
+        const stderr = cli.stderr ?? ((text: string) => process.stderr.write(text));
+        stderr(
+          `Run failed. Partial artifact (if any) saved under ${
+            path.join(fabric.config.results_dir, 'runs')
+          }\n`,
+        );
         throw err;
       }
     });

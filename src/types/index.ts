@@ -138,6 +138,13 @@ export interface TradingFabricRunResult {
   approval?: import('../policy/approvals.js').ApprovalRecord | null;
   execution: ExecutionEnvelope | null;
   durationMs: number;
+  /**
+   * Populated when the orchestrator threw before producing a complete
+   * result. The partial run is still persisted (when `persistRuns` is
+   * enabled) so analyst reports captured pre-failure can be inspected
+   * via `replay`.
+   */
+  error?: string;
 }
 
 export interface TradingFabricRunInput {

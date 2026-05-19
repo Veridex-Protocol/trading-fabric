@@ -342,6 +342,14 @@ export function applyOrchestrationEvent(
         durationMs: event.durationMs,
         footer: `Completed in ${event.durationMs}ms`,
       };
+    case 'tool_executed':
+      return {
+        ...state,
+        counters: {
+          ...state.counters,
+          toolCalls: state.counters.toolCalls + 1,
+        },
+      };
   }
 }
 
@@ -437,6 +445,8 @@ function summarizeEvent(event: OrchestrationEvent): string {
       return `Execution failed: ${event.error.message}`;
     case 'run_completed':
       return `Run completed in ${event.durationMs}ms`;
+    case 'tool_executed':
+      return `${event.agent} → ${event.toolName}${event.success ? '' : ' (failed)'} (${event.durationMs}ms)`;
   }
 }
 

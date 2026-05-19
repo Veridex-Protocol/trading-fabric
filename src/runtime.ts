@@ -47,11 +47,14 @@ export function createDefaultRuntimeOptions(args: {
 }): RuntimeOptions {
   if (args.overrides?.modelProviders) return args.overrides;
 
-  const quick = createProvider(args.config.llm_provider, {
-    config: args.config,
-    model: args.config.quick_think_llm,
-    env: args.env,
-  });
+  const quick = withProviderName(
+    createProvider(args.config.llm_provider, {
+      config: args.config,
+      model: args.config.quick_think_llm,
+      env: args.env,
+    }),
+    args.config.llm_provider,
+  );
   const deep = withProviderName(
     createProvider(args.config.llm_provider, {
       config: args.config,

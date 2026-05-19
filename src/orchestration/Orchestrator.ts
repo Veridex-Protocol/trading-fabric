@@ -109,6 +109,16 @@ export type OrchestrationEvent =
   | { type: 'execution_completed'; runId: string; envelope: ExecutionEnvelope }
   | { type: 'execution_skipped'; runId: string; reason: string }
   | { type: 'execution_failed'; runId: string; error: { code: string; message: string } }
+  | {
+      type: 'tool_executed';
+      runId: string;
+      /** Trading-fabric agent that invoked the tool (e.g. "Market Analyst"). */
+      agent: string;
+      toolName: string;
+      durationMs: number;
+      success: boolean;
+      error?: string;
+    }
   | { type: 'run_completed'; runId: string; durationMs: number };
 
 export interface RunInput {
@@ -543,7 +553,7 @@ export class Orchestrator {
           past_context: ctx.past_context,
         });
 
-        const output = await this.runAgent(definition, userMessage);
+        const output = await this.runAgent(definition, userMessage, ctx.runId);
         const report: AnalystReport = {
           kind: role,
           ticker: ctx.ticker,
@@ -587,6 +597,7 @@ export class Orchestrator {
           history,
           lastBearResponse: lastBear,
         }),
+        ctx.runId,
       );
       const bullTurn: DebateTurn = {
         speaker: 'bull',
@@ -608,6 +619,7 @@ export class Orchestrator {
           history,
           lastBullResponse: lastBull,
         }),
+        ctx.runId,
       );
       const bearTurn: DebateTurn = {
         speaker: 'bear',
@@ -656,6 +668,7 @@ export class Orchestrator {
             trader_proposal_markdown: ctx.trader_proposal_markdown,
             history,
           }),
+          ctx.runId,
         );
         const turn: RiskDebateTurn = {
           speaker,
@@ -679,7 +692,7 @@ export class Orchestrator {
     userMessage: string;
     schema: Parameters<typeof parseStructured<T>>[1];
   }): Promise<T> {
-    const raw = await this.runAgent(args.definition, args.userMessage);
+    const raw = await this.runAgent(args.definition, args.userMessage, args.runId);
     try {
       return parseStructured<T>(raw, args.schema);
     } catch (err) {
@@ -703,9 +716,43 @@ export class Orchestrator {
    * pollution, and trivial GC after the call returns. The cost is a
    * handful of allocations — dominated by the LLM round-trip.
    */
-  private async runAgent(definition: AgentDefinition, userMessage: string): Promise<string> {
+  private async runAgent(
+    definition: AgentDefinition,
+    userMessage: string,
+    runId?: string,
+  ): Promise<string> {
     const runtime: AgentRuntime = createAgent(definition, this.runtimeOptions);
     const result = await runtime.run(userMessage);
+
+    // Surface tool activity from the inner agent runtime as orchestration
+    // events so downstream observers (TUI counters, replay store, audit
+    // logs) can see which dataflow tools each analyst invoked.
+    if (runId) {
+      const agentLabel = definition.name ?? definition.id;
+      for (const ev of result.events) {
+        if (ev.type === 'tool_executed') {
+          this.emit({
+            type: 'tool_executed',
+            runId,
+            agent: agentLabel,
+            toolName: ev.data.toolName,
+            durationMs: ev.data.durationMs,
+            success: ev.data.success,
+            ...(ev.data.error ? { error: ev.data.error } : {}),
+          });
+        }
+      }
+    }
+
+    // If the underlying run failed (e.g. provider threw, policy denied),
+    // surface a typed error instead of silently returning the error
+    // message as `output` — otherwise downstream `parseStructured` will
+    // try to JSON.parse the error string and produce a confusing
+    // "Unexpected token" failure that hides the real cause.
+    if (result.run.state === 'failed') {
+      const reason = result.run.error ?? 'Agent run failed';
+      throw new Error(`Agent "${definition.name ?? definition.id}" failed: ${reason}`);
+    }
     return result.output;
   }
 

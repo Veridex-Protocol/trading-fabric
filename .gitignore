@@ -58,3 +58,4 @@ packages/contracts/aptos/build/
 # yarn.lock
 NOTES
 .aptos/
+.trading-fabric/
