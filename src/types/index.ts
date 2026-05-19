@@ -106,6 +106,21 @@ export interface TradingFabricRunResult {
   trader_proposal: string;
   risk_debate: RiskDebateTurn[];
   portfolio_decision: string;
+  /**
+   * The proposal handed to the policy engine. `null` when the run was
+   * built without a `PolicyEngine` (e.g. eval harness invocations).
+   */
+  proposal?: import('../policy/types.js').Proposal | null;
+  /**
+   * Result of the policy evaluation (verdicts + final reduction). `null`
+   * when no policy engine was wired.
+   */
+  policy_decision?: import('../policy/types.js').EngineDecision | null;
+  /**
+   * Resolved approval record when the policy engine escalated. `null`
+   * when no escalation occurred.
+   */
+  approval?: import('../policy/approvals.js').ApprovalRecord | null;
   execution: ExecutionEnvelope | null;
   durationMs: number;
 }

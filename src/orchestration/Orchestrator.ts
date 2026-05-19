@@ -59,6 +59,15 @@ import type {
 import type { TradingMemoryLog } from '../memory/log';
 import type { PendingResolver } from '../memory/resolver';
 import type { MemoryEntry } from '../memory/types';
+import type {
+  ApprovalRecord,
+  EngineDecision,
+  HumanApprovalQueue,
+  PolicyContext,
+  PolicyEngine,
+  Proposal,
+} from '../policy/index.js';
+import { defaultSizer, ratingToAction } from '../policy/index.js';
 import {
   analystUserMessage,
   bearResearcherUserMessage,
@@ -91,6 +100,9 @@ export type OrchestrationEvent =
   | { type: 'structured_output_failed'; runId: string; agent: string; error: StructuredOutputError }
   | { type: 'memory_resolved'; runId: string; ticker: Ticker; entries: MemoryEntry[] }
   | { type: 'memory_decision_stored'; runId: string; entry: MemoryEntry }
+  | { type: 'policy_evaluated'; runId: string; proposal: Proposal; decision: EngineDecision }
+  | { type: 'approval_required'; runId: string; approvalId: string; proposal: Proposal; decision: EngineDecision }
+  | { type: 'approval_resolved'; runId: string; approvalId: string; record: ApprovalRecord }
   | { type: 'run_completed'; runId: string; durationMs: number };
 
 export interface RunInput {
@@ -125,6 +137,32 @@ export interface OrchestratorOptions {
    * log before this run reads it.
    */
   resolver?: PendingResolver;
+  /**
+   * Optional policy engine. When supplied, the orchestrator builds a
+   * `Proposal` from the Portfolio Manager decision via `sizer` (default
+   * uses `config.max_position_usd`), evaluates the engine, and:
+   *  - on `deny` records the verdicts and skips approval;
+   *  - on `escalate` submits to `approvals` (required when escalate is
+   *    possible) and awaits the human decision;
+   *  - on `allow` records the verdicts and proceeds.
+   *
+   * Without a `policy` value the run skips this step entirely — useful
+   * for unit tests of the graph itself.
+   */
+  policy?: PolicyEngine;
+  /** Required when `policy` may emit `escalate` verdicts. */
+  approvals?: HumanApprovalQueue;
+  /**
+   * Maps `(rating, config)` to a USD notional. Defaults to
+   * `defaultSizer(rating, config.max_position_usd)`.
+   */
+  sizer?: (rating: PortfolioDecision['rating'], config: TradingFabricConfig) => number;
+  /**
+   * Returns the runtime context (daily spend, last trade time, last
+   * alpha) for the policy engine. Defaults to a zeroed snapshot — the
+   * caller is responsible for stitching in real state.
+   */
+  policyContext?: (input: RunInput) => PolicyContext | Promise<PolicyContext>;
   onEvent?: (event: OrchestrationEvent) => void;
 }
 
@@ -139,6 +177,15 @@ export class Orchestrator {
   private readonly runtimeOptions: RuntimeOptions;
   private readonly memory: TradingMemoryLog | null;
   private readonly resolver: PendingResolver | null;
+  private readonly policy: PolicyEngine | null;
+  private readonly approvals: HumanApprovalQueue | null;
+  private readonly sizer: (
+    rating: PortfolioDecision['rating'],
+    config: TradingFabricConfig,
+  ) => number;
+  private readonly policyContext: (
+    input: RunInput,
+  ) => PolicyContext | Promise<PolicyContext>;
   private readonly onEvent: (event: OrchestrationEvent) => void;
 
   constructor(options: OrchestratorOptions) {
@@ -147,6 +194,18 @@ export class Orchestrator {
     this.runtimeOptions = options.runtimeOptions;
     this.memory = options.memory ?? null;
     this.resolver = options.resolver ?? null;
+    this.policy = options.policy ?? null;
+    this.approvals = options.approvals ?? null;
+    this.sizer =
+      options.sizer ?? ((rating, config) => defaultSizer(rating, config.max_position_usd));
+    this.policyContext =
+      options.policyContext ??
+      (() => ({
+        dailySpendUsd: 0,
+        lastTradeAt: null,
+        lastAlphaReturn: null,
+        now: () => new Date(),
+      }));
     this.onEvent = options.onEvent ?? (() => {});
   }
 
@@ -284,6 +343,58 @@ export class Orchestrator {
       }
     }
 
+    // ── 8. Policy + (optional) human approval ────────────────────
+    let proposal: Proposal | null = null;
+    let policyDecision: EngineDecision | null = null;
+    let approval: ApprovalRecord | null = null;
+    if (this.policy) {
+      proposal = {
+        decisionId: randomUUID(),
+        runId,
+        ticker: input.ticker,
+        trade_date: input.trade_date,
+        rating: portfolioDecision.rating,
+        action: ratingToAction(portfolioDecision.rating),
+        amountUsd: this.sizer(portfolioDecision.rating, this.config),
+      };
+      const ctx = await this.policyContext(input);
+      policyDecision = this.policy.evaluate(proposal, ctx);
+      this.emit({ type: 'policy_evaluated', runId, proposal, decision: policyDecision });
+
+      if (policyDecision.decision === 'escalate') {
+        if (!this.approvals) {
+          // No approval transport configured — treat as denied to avoid
+          // silently executing a flagged trade.
+          policyDecision = {
+            decision: 'deny',
+            verdicts: policyDecision.verdicts,
+            primaryReason:
+              policyDecision.primaryReason ??
+              'Escalation requested but no approval queue is configured',
+          };
+        } else {
+          const handle = await this.approvals.submit({
+            proposal,
+            verdicts: policyDecision.verdicts,
+          });
+          this.emit({
+            type: 'approval_required',
+            runId,
+            approvalId: handle.id,
+            proposal,
+            decision: policyDecision,
+          });
+          approval = await handle.awaitDecision();
+          this.emit({
+            type: 'approval_resolved',
+            runId,
+            approvalId: handle.id,
+            record: approval,
+          });
+        }
+      }
+    }
+
     const durationMs = Date.now() - started;
     this.emit({ type: 'run_completed', runId, durationMs });
 
@@ -298,7 +409,10 @@ export class Orchestrator {
       trader_proposal: trader_proposal_markdown,
       risk_debate,
       portfolio_decision: portfolio_decision_markdown,
-      execution: null, // Phase 7-8 will populate this.
+      proposal,
+      policy_decision: policyDecision,
+      approval,
+      execution: null, // Phase 8 will populate this.
       durationMs,
     };
   }

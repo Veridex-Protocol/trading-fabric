@@ -20,6 +20,7 @@ export * from './config/index.js';
 export * as schemas from './schemas/index.js';
 export * as orchestration from './orchestration/index.js';
 export * as memory from './memory/index.js';
+export * as policy from './policy/index.js';
 
 export interface CreateTradingFabricOptions {
   config?: Partial<TradingFabricConfig>;
