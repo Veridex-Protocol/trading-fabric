@@ -25,6 +25,7 @@ target/
 # IDE
 .idea/
 .vscode/
+.veridex/
 *.swp
 *.swo
 
