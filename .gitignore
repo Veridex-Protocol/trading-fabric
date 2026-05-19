@@ -1,0 +1,59 @@
+# Dependencies
+node_modules/
+packages/*/node_modules/
+
+# Build outputs
+dist/
+build/
+cache/
+typechain-types/
+coverage/
+coverage.json
+.nyc_output/
+target/
+
+# Environment files - NEVER commit secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+**/deploy-keypair.json
+**/buffer-keypair.json
+**/secrets.yaml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Database
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# Test artifacts
+.turbo/
+
+# Solana
+packages/contracts/solana/target/
+
+# Aptos
+packages/contracts/aptos/build/
+
+# Lock files (optional - uncomment if preferred)
+# bun.lock
+# package-lock.json
+# yarn.lock
+NOTES
+.aptos/
