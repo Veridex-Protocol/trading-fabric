@@ -234,8 +234,10 @@ function errorEnvelope(
  */
 export function toBaseUnits(amount: number, decimals: number): string {
   if (!Number.isFinite(amount) || amount <= 0) return '0';
-  const [intPart, fracPart = ''] = amount.toString().split('.');
-  const paddedFrac = (fracPart + '0'.repeat(decimals)).slice(0, decimals);
-  const combined = `${intPart}${paddedFrac}`.replace(/^0+/, '');
-  return combined.length === 0 ? '0' : combined;
+  const scale = 10 ** decimals;
+  const units = Math.trunc(amount * scale);
+  if (!Number.isSafeInteger(units)) {
+    throw new Error('amount is too large to convert safely from a number');
+  }
+  return units.toString();
 }

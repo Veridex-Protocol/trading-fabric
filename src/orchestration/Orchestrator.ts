@@ -177,6 +177,12 @@ export interface OrchestratorOptions {
    * the run result. Without an executor the run remains advisory-only.
    */
   executor?: ExecutionProvider;
+  /**
+   * Optional paper/simulation provider used when `execute_enabled=false`.
+   * This is the safety default for local runs: skip the real SDK, still
+   * write an execution envelope / ledger entry for audit parity.
+   */
+  simulationExecutor?: ExecutionProvider;
   onEvent?: (event: OrchestrationEvent) => void;
 }
 
@@ -201,6 +207,7 @@ export class Orchestrator {
     input: RunInput,
   ) => PolicyContext | Promise<PolicyContext>;
   private readonly executor: ExecutionProvider | null;
+  private readonly simulationExecutor: ExecutionProvider | null;
   private readonly onEvent: (event: OrchestrationEvent) => void;
 
   constructor(options: OrchestratorOptions) {
@@ -222,6 +229,7 @@ export class Orchestrator {
         now: () => new Date(),
       }));
     this.executor = options.executor ?? null;
+    this.simulationExecutor = options.simulationExecutor ?? null;
     this.onEvent = options.onEvent ?? (() => {});
   }
 
@@ -454,9 +462,11 @@ export class Orchestrator {
     policyDecision: EngineDecision | null;
     approval: ApprovalRecord | null;
   }): Promise<ExecutionEnvelope | null> {
-    if (!this.executor) return null;
-    if (!this.config.execute_enabled) {
-      this.emit({ type: 'execution_skipped', runId: ctx.runId, reason: 'execute_disabled' });
+    if (!this.executor && !this.simulationExecutor) return null;
+    const activeExecutor = this.config.execute_enabled ? this.executor : this.simulationExecutor;
+    if (!activeExecutor) {
+      const reason = this.config.execute_enabled ? 'no_executor' : 'no_simulation_executor';
+      this.emit({ type: 'execution_skipped', runId: ctx.runId, reason });
       return null;
     }
     if (!ctx.proposal || !ctx.policyDecision) {
@@ -484,11 +494,12 @@ export class Orchestrator {
       amountUsd: ctx.proposal.amountUsd,
       policyVerdicts: ctx.policyDecision.verdicts,
       traceId: ctx.runId,
+      hints: { executionMode: this.config.execute_enabled ? 'real' : 'simulation' },
     };
 
     this.emit({ type: 'execution_started', runId: ctx.runId, request });
     try {
-      const envelope = await this.executor.execute(request);
+      const envelope = await activeExecutor.execute(request);
       this.emit({ type: 'execution_completed', runId: ctx.runId, envelope });
       return envelope;
     } catch (err) {

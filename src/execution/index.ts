@@ -7,16 +7,23 @@ export * from './types.js';
 export * from './paper.js';
 export * from './router.js';
 export {
+  VeridexExecutor,
   VeridexExecutionProvider,
   usdToBaseUnits,
-} from './veridex/provider.js';
+} from './VeridexExecutor.js';
 export type {
   VeridexExecutionProviderOptions,
+  VeridexRelayerLike,
+  VeridexRelayerResult,
+  VeridexRelayerSubmitRequest,
   VeridexSDKLike,
+  VeridexSessionAction,
+  VeridexSessionInfo,
   VeridexSessionManagerLike,
+  VeridexSessionSignedAction,
   VeridexTransferParams,
   VeridexTransferResult,
-} from './veridex/provider.js';
+} from './VeridexExecutor.js';
 export {
   SeraExecutionProvider,
   toBaseUnits,
