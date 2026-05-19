@@ -298,9 +298,9 @@ function renderEvalReport(report: Awaited<ReturnType<typeof runTradingEvalSuite>
 
 // Only auto-run when invoked as a script (so tests can import buildProgram).
 const isMain =
-  typeof require !== 'undefined' && require.main === module
-    ? true
-    : import.meta.url === `file://${process.argv[1]}`;
+  typeof require !== 'undefined' &&
+  typeof module !== 'undefined' &&
+  require.main === module;
 
 if (isMain) {
   buildProgram().parseAsync(process.argv).catch((err) => {
