@@ -6,6 +6,7 @@
  */
 
 import { promises as fs } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 
 import { Command } from 'commander';
 
@@ -298,9 +299,10 @@ function renderEvalReport(report: Awaited<ReturnType<typeof runTradingEvalSuite>
 
 // Only auto-run when invoked as a script (so tests can import buildProgram).
 const isMain =
-  typeof require !== 'undefined' &&
-  typeof module !== 'undefined' &&
-  require.main === module;
+  (typeof require !== 'undefined' &&
+    typeof module !== 'undefined' &&
+    require.main === module) ||
+  (process.argv[1] ? import.meta.url === pathToFileURL(process.argv[1]).href : false);
 
 if (isMain) {
   buildProgram().parseAsync(process.argv).catch((err) => {

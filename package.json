@@ -8,7 +8,7 @@
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
   "bin": {
-    "trading-fabric": "dist/cli/index.js"
+    "trading-fabric": "dist/cli/index.mjs"
   },
   "exports": {
     ".": {
@@ -83,7 +83,7 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "eval": "bun run build && node dist/cli/index.js eval run all",
+    "eval": "bun run build && node dist/cli/index.mjs eval run all",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "tsc --noEmit",

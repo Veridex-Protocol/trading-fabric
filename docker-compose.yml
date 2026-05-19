@@ -18,7 +18,7 @@ services:
     command:
       - sh
       - -lc
-      - bun install --frozen-lockfile && bun run build && node dist/cli/index.js eval run all
+      - bun install --frozen-lockfile && bun run build && node dist/cli/index.mjs eval run all
     cap_drop:
       - ALL
     security_opt:

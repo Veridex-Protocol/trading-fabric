@@ -44,8 +44,8 @@ limits:
 Validate:
 
 ```bash
-node dist/cli/index.js policy validate ./policy.json
-node dist/cli/index.js policy validate ./policy.yaml --json
+node dist/cli/index.mjs policy validate ./policy.json
+node dist/cli/index.mjs policy validate ./policy.yaml --json
 ```
 
 Validation dry-runs three proposals:
@@ -95,19 +95,19 @@ Escalated decisions are written to:
 Approve:
 
 ```bash
-node dist/cli/index.js approve <approval-id> --reason "Approved within daily budget"
+node dist/cli/index.mjs approve <approval-id> --reason "Approved within daily budget"
 ```
 
 Deny:
 
 ```bash
-node dist/cli/index.js approve <approval-id> --deny --reason "Concentration risk too high"
+node dist/cli/index.mjs approve <approval-id> --deny --reason "Concentration risk too high"
 ```
 
 Use a custom inbox:
 
 ```bash
-node dist/cli/index.js approve <approval-id> --dir ./approvals --json
+node dist/cli/index.mjs approve <approval-id> --dir ./approvals --json
 ```
 
 ## Programmatic policy context
@@ -138,8 +138,8 @@ This will escalate most buy/sell proposals until a human decides.
 
 ```bash
 bun run build
-node dist/cli/index.js policy validate ./policy.json --json
-node dist/cli/index.js eval run policy --json
+node dist/cli/index.mjs policy validate ./policy.json --json
+node dist/cli/index.mjs eval run policy --json
 ```
 
 The policy eval suite exercises the same engine used by real runs.

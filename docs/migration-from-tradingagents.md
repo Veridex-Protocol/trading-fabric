@@ -47,9 +47,9 @@ TypeScript package:
 
 ```bash
 bun run build
-node dist/cli/index.js run AAPL --provider openai
-node dist/cli/index.js eval run structured-output
-node dist/cli/index.js eval run all
+node dist/cli/index.mjs run AAPL --provider openai
+node dist/cli/index.mjs eval run structured-output
+node dist/cli/index.mjs eval run all
 ```
 
 ## Staged migration plan
@@ -64,7 +64,7 @@ node dist/cli/index.js eval run all
 2. Run a single-ticker paper decision with JSON output.
 
    ```bash
-   node dist/cli/index.js run SPY --date 2025-06-05 --no-tui
+   node dist/cli/index.mjs run SPY --date 2025-06-05 --no-tui
    ```
 
 3. Compare the generated `portfolio_decision` with a known TradingAgents output for the same ticker/date.
@@ -72,13 +72,13 @@ node dist/cli/index.js eval run all
 4. Enable the TUI once the run shape is accepted.
 
    ```bash
-   node dist/cli/index.js run SPY --date 2025-06-05
+   node dist/cli/index.mjs run SPY --date 2025-06-05
    ```
 
 5. Add policy limits and validate them.
 
    ```bash
-   node dist/cli/index.js policy validate ./policy.json
+   node dist/cli/index.mjs policy validate ./policy.json
    ```
 
 6. Turn on approval routing for escalations. Keep execution disabled.
@@ -119,7 +119,7 @@ Agent prompts live in `src/agents/instructions.ts`. Keep the role boundaries int
 The reference `smoke_structured_output.py` calls the Research Manager, Trader, and Portfolio Manager directly against a live provider. `trading-fabric` keeps the same three-stage smoke but runs it through `@veridex/agents` with deterministic replay fixtures by default.
 
 ```bash
-node dist/cli/index.js eval run structured-output --json
+node dist/cli/index.mjs eval run structured-output --json
 ```
 
 Use `--live --provider openai` when intentionally refreshing fixtures or checking provider behavior.

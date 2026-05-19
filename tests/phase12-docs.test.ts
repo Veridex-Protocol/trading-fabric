@@ -51,7 +51,7 @@ describe('Phase 12 docs and packaging', () => {
     expect(pkg.files).toContain('examples');
     expect(pkg.files).toContain('docker-compose.yml');
     expect(pkg.files).toContain('.env.example');
-    expect(pkg.scripts.eval).toBe('bun run build && node dist/cli/index.js eval run all');
+    expect(pkg.scripts.eval).toBe('bun run build && node dist/cli/index.mjs eval run all');
   });
 
   test('uses pinned compose images and avoids host port exposure by default', () => {

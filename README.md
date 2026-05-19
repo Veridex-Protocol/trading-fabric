@@ -36,31 +36,31 @@ bun run eval
 Run a simulated trade with JSON output:
 
 ```bash
-node dist/cli/index.js run SPY --date 2025-06-05 --no-tui
+node dist/cli/index.mjs run SPY --date 2025-06-05 --no-tui
 ```
 
 Run with the Ink TUI:
 
 ```bash
-node dist/cli/index.js run AAPL --provider openai
+node dist/cli/index.mjs run AAPL --provider openai
 ```
 
 Replay a saved run artifact:
 
 ```bash
-node dist/cli/index.js replay ~/.trading-fabric/results/runs/<run-id>.json
+node dist/cli/index.mjs replay ~/.trading-fabric/results/runs/<run-id>.json
 ```
 
 Approve a pending escalated decision:
 
 ```bash
-node dist/cli/index.js approve <approval-id> --reason "Within daily treasury budget"
+node dist/cli/index.mjs approve <approval-id> --reason "Within daily treasury budget"
 ```
 
 Validate a policy file:
 
 ```bash
-node dist/cli/index.js policy validate docs/examples/policy.tight.json
+node dist/cli/index.mjs policy validate docs/examples/policy.tight.json
 ```
 
 ## Configuration
@@ -177,7 +177,7 @@ With local Ollama:
 
 ```bash
 UID=$(id -u) GID=$(id -g) docker compose --profile ollama up -d ollama
-UID=$(id -u) GID=$(id -g) docker compose --profile ollama run --rm trading-fabric node dist/cli/index.js eval run all
+UID=$(id -u) GID=$(id -g) docker compose --profile ollama run --rm trading-fabric node dist/cli/index.mjs eval run all
 ```
 
 ## Documentation
