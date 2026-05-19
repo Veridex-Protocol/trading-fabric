@@ -64,8 +64,8 @@ export interface RiskDebateTurn {
  * The envelope written when the Portfolio Manager's decision is executed.
  *
  * In simulation mode `txHash` is a synthetic id and `signedAction` is
- * absent. In real-execution mode this carries the @veridex/sdk session
- * key signed action and the on-chain transaction hash from the relayer.
+ * absent. In real-execution mode this carries the protocol-specific
+ * settlement reference (e.g. Sera swap UUID + on-chain tx hash).
  *
  * `policyVerdicts` captures every PolicyEngine decision that the proposal
  * passed through; `traceId` indexes into the EventBus log so a reader can
@@ -86,8 +86,23 @@ export interface ExecutionEnvelope {
   }>;
   traceId: string;
   executedAt: string;
-  /** `simulation` when --execute=false; `testnet` when a real tx happened. */
-  surface: 'simulation' | 'testnet';
+  /**
+   * Where the envelope was produced.
+   *   - `simulation`  — paper trading; no real action taken.
+   *   - `quote_only`  — a quote was fetched but never executed.
+   *   - `testnet`     — executed against a test network (e.g. Sera Sepolia).
+   *   - `mainnet`     — executed against production rails.
+   *   - `failed`      — the provider attempted execution and rejected.
+   */
+  surface: 'simulation' | 'quote_only' | 'testnet' | 'mainnet' | 'failed';
+  /** Logical provider that produced the envelope (e.g. `paper`, `sera`). */
+  provider: string;
+  /** Final execution status. Useful when settlement is async. */
+  status: 'filled' | 'pending' | 'rejected' | 'skipped';
+  /** Provider-specific data (quote uuid, route hash, fee breakdown, ...). */
+  metadata?: Record<string, unknown>;
+  /** Populated when `status === 'rejected'`. */
+  error?: { code: string; message: string } | null;
 }
 
 /**

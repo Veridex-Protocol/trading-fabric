@@ -68,6 +68,8 @@ import type {
   Proposal,
 } from '../policy/index.js';
 import { defaultSizer, ratingToAction } from '../policy/index.js';
+import type { ExecutionProvider, ExecutionRequest } from '../execution/types.js';
+import type { ExecutionEnvelope } from '../types/index.js';
 import {
   analystUserMessage,
   bearResearcherUserMessage,
@@ -103,6 +105,10 @@ export type OrchestrationEvent =
   | { type: 'policy_evaluated'; runId: string; proposal: Proposal; decision: EngineDecision }
   | { type: 'approval_required'; runId: string; approvalId: string; proposal: Proposal; decision: EngineDecision }
   | { type: 'approval_resolved'; runId: string; approvalId: string; record: ApprovalRecord }
+  | { type: 'execution_started'; runId: string; request: ExecutionRequest }
+  | { type: 'execution_completed'; runId: string; envelope: ExecutionEnvelope }
+  | { type: 'execution_skipped'; runId: string; reason: string }
+  | { type: 'execution_failed'; runId: string; error: { code: string; message: string } }
   | { type: 'run_completed'; runId: string; durationMs: number };
 
 export interface RunInput {
@@ -163,6 +169,14 @@ export interface OrchestratorOptions {
    * caller is responsible for stitching in real state.
    */
   policyContext?: (input: RunInput) => PolicyContext | Promise<PolicyContext>;
+  /**
+   * Optional execution provider (or `ExecutionRouter`). When supplied AND
+   * `config.execute_enabled === true` AND the policy verdict authorizes
+   * the trade (allow, or escalate → approved), the orchestrator calls
+   * `executor.execute(request)` and stamps the resulting envelope onto
+   * the run result. Without an executor the run remains advisory-only.
+   */
+  executor?: ExecutionProvider;
   onEvent?: (event: OrchestrationEvent) => void;
 }
 
@@ -186,6 +200,7 @@ export class Orchestrator {
   private readonly policyContext: (
     input: RunInput,
   ) => PolicyContext | Promise<PolicyContext>;
+  private readonly executor: ExecutionProvider | null;
   private readonly onEvent: (event: OrchestrationEvent) => void;
 
   constructor(options: OrchestratorOptions) {
@@ -206,6 +221,7 @@ export class Orchestrator {
         lastAlphaReturn: null,
         now: () => new Date(),
       }));
+    this.executor = options.executor ?? null;
     this.onEvent = options.onEvent ?? (() => {});
   }
 
@@ -394,6 +410,14 @@ export class Orchestrator {
       }
     }
 
+    // ── 9. Execution adapter ────────────────────────────────────
+    const execution = await this.maybeExecute({
+      runId,
+      proposal,
+      policyDecision,
+      approval,
+    });
+
     const durationMs = Date.now() - started;
     this.emit({ type: 'run_completed', runId, durationMs });
 
@@ -411,9 +435,71 @@ export class Orchestrator {
       proposal,
       policy_decision: policyDecision,
       approval,
-      execution: null, // Phase 8 will populate this.
+      execution,
       durationMs,
     };
+  }
+
+  /**
+   * Apply the execution gate.
+   *
+   * The orchestrator executes only when the trade is *both* enabled
+   * (`config.execute_enabled`) and authorized by the policy/approval
+   * chain. Every short-circuit emits an `execution_skipped` event with
+   * a stable reason code so audit consumers can attribute non-fills.
+   */
+  private async maybeExecute(ctx: {
+    runId: string;
+    proposal: Proposal | null;
+    policyDecision: EngineDecision | null;
+    approval: ApprovalRecord | null;
+  }): Promise<ExecutionEnvelope | null> {
+    if (!this.executor) return null;
+    if (!this.config.execute_enabled) {
+      this.emit({ type: 'execution_skipped', runId: ctx.runId, reason: 'execute_disabled' });
+      return null;
+    }
+    if (!ctx.proposal || !ctx.policyDecision) {
+      this.emit({ type: 'execution_skipped', runId: ctx.runId, reason: 'no_policy_decision' });
+      return null;
+    }
+    if (ctx.policyDecision.decision === 'deny') {
+      this.emit({ type: 'execution_skipped', runId: ctx.runId, reason: 'policy_denied' });
+      return null;
+    }
+    if (ctx.policyDecision.decision === 'escalate') {
+      if (!ctx.approval || ctx.approval.status !== 'approved') {
+        this.emit({ type: 'execution_skipped', runId: ctx.runId, reason: 'approval_denied' });
+        return null;
+      }
+    }
+
+    const request: ExecutionRequest = {
+      decisionId: ctx.proposal.decisionId,
+      runId: ctx.runId,
+      ticker: ctx.proposal.ticker,
+      trade_date: ctx.proposal.trade_date,
+      rating: ctx.proposal.rating,
+      action: ctx.proposal.action,
+      amountUsd: ctx.proposal.amountUsd,
+      policyVerdicts: ctx.policyDecision.verdicts,
+      traceId: ctx.runId,
+    };
+
+    this.emit({ type: 'execution_started', runId: ctx.runId, request });
+    try {
+      const envelope = await this.executor.execute(request);
+      this.emit({ type: 'execution_completed', runId: ctx.runId, envelope });
+      return envelope;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.emit({
+        type: 'execution_failed',
+        runId: ctx.runId,
+        error: { code: 'PROVIDER_THREW', message },
+      });
+      return null;
+    }
   }
 
   // ── Phase helpers ─────────────────────────────────────────────────
