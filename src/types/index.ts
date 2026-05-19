@@ -139,3 +139,11 @@ export interface TradingFabricRunResult {
   execution: ExecutionEnvelope | null;
   durationMs: number;
 }
+
+export interface TradingFabricRunInput {
+  ticker: string;
+  trade_date?: string;
+  asset_type?: AssetType;
+  analysts?: AnalystKey[];
+  past_context?: string | null;
+}

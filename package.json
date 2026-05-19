@@ -51,6 +51,21 @@
       "import": "./dist/execution/index.mjs",
       "require": "./dist/execution/index.js"
     },
+    "./runtime": {
+      "types": "./dist/runtime.d.ts",
+      "import": "./dist/runtime.mjs",
+      "require": "./dist/runtime.js"
+    },
+    "./replay": {
+      "types": "./dist/replay/index.d.ts",
+      "import": "./dist/replay/index.mjs",
+      "require": "./dist/replay/index.js"
+    },
+    "./evals": {
+      "types": "./dist/evals/index.d.ts",
+      "import": "./dist/evals/index.mjs",
+      "require": "./dist/evals/index.js"
+    },
     "./tui": {
       "types": "./dist/tui/index.d.ts",
       "import": "./dist/tui/index.mjs"
