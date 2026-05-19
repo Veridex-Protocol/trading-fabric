@@ -132,7 +132,11 @@ export function buildProgram(cli: BuildProgramOptions = {}): Command {
         });
         view?.unmount();
         if (command.tui === false) writeJson(stdout, result);
-        else stdout(`Run ${result.runId} completed for ${result.ticker}\n`);
+        else {
+          const runsDir = path.join(fabric.config.results_dir, 'runs');
+          stdout(`Run ${result.runId} completed for ${result.ticker}\n`);
+          stdout(`Reports written under ${runsDir}/<ticker>-<date>-<runid>/\n`);
+        }
       } catch (err) {
         view?.unmount();
         // `persistRuns: true` saves a partial artifact even when the

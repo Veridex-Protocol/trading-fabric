@@ -35,6 +35,7 @@ import {
   loadRunArtifact,
   replayRunArtifact,
   writeRunArtifact,
+  writeRunReports,
   type LoadedRunArtifact,
   type ReplayResult,
 } from './replay';
@@ -177,6 +178,12 @@ export function createTradingFabric(
               events,
             });
             await writeRunArtifact({ config: runConfig, artifact });
+            // Best-effort: human-readable per-run markdown folder.
+            try {
+              await writeRunReports({ config: runConfig, artifact });
+            } catch {
+              /* persistence is best-effort on the failure path */
+            }
           } catch {
             // Persistence is best-effort on the failure path.
           }
@@ -187,6 +194,7 @@ export function createTradingFabric(
       if (options.persistRuns) {
         const artifact = createRunArtifact({ version: VERSION, input, result, events });
         await writeRunArtifact({ config: runConfig, artifact });
+        await writeRunReports({ config: runConfig, artifact });
       }
       return result;
     },
