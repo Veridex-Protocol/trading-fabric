@@ -6,7 +6,7 @@
  */
 
 import { promises as fs } from 'node:fs';
-import { pathToFileURL } from 'node:url';
+import * as path from 'node:path';
 
 import { Command } from 'commander';
 
@@ -302,11 +302,17 @@ const isMain =
   (typeof require !== 'undefined' &&
     typeof module !== 'undefined' &&
     require.main === module) ||
-  (process.argv[1] ? import.meta.url === pathToFileURL(process.argv[1]).href : false);
+  isCliEntrypoint(process.argv[1]);
 
 if (isMain) {
   buildProgram().parseAsync(process.argv).catch((err) => {
     process.stderr.write(`${err instanceof Error ? err.message : String(err)}\n`);
     process.exit(1);
   });
+}
+
+function isCliEntrypoint(entrypoint: string | undefined): boolean {
+  if (!entrypoint) return false;
+  if (path.basename(entrypoint) === 'trading-fabric') return true;
+  return /(?:^|[/\\])(?:src|dist)[/\\]cli[/\\]index\.(?:ts|js|mjs)$/.test(entrypoint);
 }
