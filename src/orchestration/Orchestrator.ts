@@ -369,7 +369,6 @@ export class Orchestrator {
             decision: 'deny',
             verdicts: policyDecision.verdicts,
             primaryReason:
-              policyDecision.primaryReason ??
               'Escalation requested but no approval queue is configured',
           };
         } else {
