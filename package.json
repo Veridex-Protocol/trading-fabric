@@ -31,6 +31,11 @@
       "import": "./dist/dataflows/index.mjs",
       "require": "./dist/dataflows/index.js"
     },
+    "./llm": {
+      "types": "./dist/llm/index.d.ts",
+      "import": "./dist/llm/index.mjs",
+      "require": "./dist/llm/index.js"
+    },
     "./schemas": {
       "types": "./dist/schemas/index.d.ts",
       "import": "./dist/schemas/index.mjs",
