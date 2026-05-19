@@ -45,6 +45,15 @@
       "types": "./dist/config/index.d.ts",
       "import": "./dist/config/index.mjs",
       "require": "./dist/config/index.js"
+    },
+    "./execution": {
+      "types": "./dist/execution/index.d.ts",
+      "import": "./dist/execution/index.mjs",
+      "require": "./dist/execution/index.js"
+    },
+    "./tui": {
+      "types": "./dist/tui/index.d.ts",
+      "import": "./dist/tui/index.mjs"
     }
   },
   "files": [
@@ -64,6 +73,8 @@
     "@veridex/agents": "workspace:*",
     "commander": "^12.1.0",
     "date-fns": "^3.6.0",
+    "ink": "^5.2.1",
+    "react": "^18.3.1",
     "zod": "^3.22.0"
   },
   "peerDependencies": {
@@ -76,6 +87,8 @@
   },
   "devDependencies": {
     "@types/node": "^25.5.2",
+    "@types/react": "^18.3.11",
+    "ink-testing-library": "^3.0.0",
     "tsup": "^8.0.0",
     "typescript": "^5.0.0",
     "vitest": "^1.0.0"

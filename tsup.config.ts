@@ -9,6 +9,8 @@ export default defineConfig({
     'src/llm/index.ts',
     'src/schemas/index.ts',
     'src/config/index.ts',
+    'src/execution/index.ts',
+    'src/tui/index.ts',
     'src/cli/index.ts',
   ],
   format: ['cjs', 'esm'],
