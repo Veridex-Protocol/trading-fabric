@@ -56,6 +56,9 @@ import type {
   TradeDate,
   TradingFabricRunResult,
 } from '../types';
+import type { TradingMemoryLog } from '../memory/log';
+import type { PendingResolver } from '../memory/resolver';
+import type { MemoryEntry } from '../memory/types';
 import {
   analystUserMessage,
   bearResearcherUserMessage,
@@ -86,6 +89,8 @@ export type OrchestrationEvent =
   | { type: 'risk_turn'; runId: string; turn: RiskDebateTurn }
   | { type: 'portfolio_decision_ready'; runId: string; decision: PortfolioDecision }
   | { type: 'structured_output_failed'; runId: string; agent: string; error: StructuredOutputError }
+  | { type: 'memory_resolved'; runId: string; ticker: Ticker; entries: MemoryEntry[] }
+  | { type: 'memory_decision_stored'; runId: string; entry: MemoryEntry }
   | { type: 'run_completed'; runId: string; durationMs: number };
 
 export interface RunInput {
@@ -106,6 +111,20 @@ export interface OrchestratorOptions {
    * memory stores are wired through here.
    */
   runtimeOptions: RuntimeOptions;
+  /**
+   * Optional memory log. When supplied, the orchestrator (a) writes a
+   * `pending` entry after each portfolio-manager decision and (b) feeds
+   * the resolved `past_context` blob into analyst + portfolio-manager
+   * prompts. Outcome resolution requires `resolver` as well.
+   */
+  memory?: TradingMemoryLog;
+  /**
+   * Optional pending-entry resolver. When supplied alongside `memory`,
+   * the orchestrator calls `resolver.resolvePendingFor(ticker)` at the
+   * start of each run so realised returns + reflections land in the
+   * log before this run reads it.
+   */
+  resolver?: PendingResolver;
   onEvent?: (event: OrchestrationEvent) => void;
 }
 
@@ -118,12 +137,16 @@ export class Orchestrator {
   private readonly agents: TradingAgentSet;
   private readonly config: TradingFabricConfig;
   private readonly runtimeOptions: RuntimeOptions;
+  private readonly memory: TradingMemoryLog | null;
+  private readonly resolver: PendingResolver | null;
   private readonly onEvent: (event: OrchestrationEvent) => void;
 
   constructor(options: OrchestratorOptions) {
     this.agents = options.agents;
     this.config = options.config;
     this.runtimeOptions = options.runtimeOptions;
+    this.memory = options.memory ?? null;
+    this.resolver = options.resolver ?? null;
     this.onEvent = options.onEvent ?? (() => {});
   }
 
@@ -142,6 +165,27 @@ export class Orchestrator {
       asset_type,
     });
 
+    // ── 0. Memory: resolve pending outcomes + build past_context ──
+    // Explicit `input.past_context` overrides memory-derived context.
+    let past_context: string | null = input.past_context ?? null;
+    if (this.memory) {
+      if (this.resolver) {
+        try {
+          const resolved = await this.resolver.resolvePendingFor(input.ticker);
+          if (resolved.length > 0) {
+            this.emit({ type: 'memory_resolved', runId, ticker: input.ticker, entries: resolved });
+          }
+        } catch {
+          // Resolution failures must never block a run; pending entries
+          // are retried on the next invocation.
+        }
+      }
+      if (past_context === null) {
+        const memo = await this.memory.getPastContext(input.ticker);
+        past_context = memo.length > 0 ? memo : null;
+      }
+    }
+
     // ── 1. Analyst phase ──────────────────────────────────────────
     const reports = await this.runAnalysts({
       runId,
@@ -149,7 +193,7 @@ export class Orchestrator {
       ticker: input.ticker,
       trade_date: input.trade_date,
       asset_type,
-      past_context: input.past_context ?? null,
+      past_context,
     });
 
     // ── 2. Bull vs Bear debate ────────────────────────────────────
@@ -217,11 +261,28 @@ export class Orchestrator {
         research_plan_markdown,
         trader_proposal_markdown,
         risk_history: risk_debate,
-        past_context: input.past_context ?? null,
+        past_context,
       }),
       schema: PortfolioDecision,
     });
     this.emit({ type: 'portfolio_decision_ready', runId, decision: portfolioDecision });
+
+    const portfolio_decision_markdown = renderPortfolioDecision(portfolioDecision);
+
+    // ── 7. Memory: persist pending entry for this decision ───────
+    if (this.memory) {
+      try {
+        const entry = await this.memory.storeDecision({
+          ticker: input.ticker,
+          trade_date: input.trade_date,
+          rating: portfolioDecision.rating,
+          decision: portfolio_decision_markdown,
+        });
+        this.emit({ type: 'memory_decision_stored', runId, entry });
+      } catch {
+        // Memory write failure must not poison the returned result.
+      }
+    }
 
     const durationMs = Date.now() - started;
     this.emit({ type: 'run_completed', runId, durationMs });
@@ -236,7 +297,7 @@ export class Orchestrator {
       research_plan: research_plan_markdown,
       trader_proposal: trader_proposal_markdown,
       risk_debate,
-      portfolio_decision: renderPortfolioDecision(portfolioDecision),
+      portfolio_decision: portfolio_decision_markdown,
       execution: null, // Phase 7-8 will populate this.
       durationMs,
     };
