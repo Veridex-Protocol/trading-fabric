@@ -73,12 +73,17 @@
   },
   "files": [
     "dist",
+    "docs",
+    "examples",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "docker-compose.yml",
+    ".env.example"
   ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
+    "eval": "bun run build && node dist/cli/index.js eval run all",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "tsc --noEmit",

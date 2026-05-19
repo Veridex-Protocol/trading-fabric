@@ -96,6 +96,10 @@ export interface TradingFabricConfig {
   instrument_allowlist: string[];
   /** Veridex SDK chain for execution. */
   execution_chain: 'base-sepolia' | 'base' | 'ethereum-sepolia';
+  /** Session limit minted on first run (USD). Default: $50 USDC. */
+  session_max_value_usd: number;
+  /** Session lifetime minted on first run (seconds). Default: 86_400 (24h). */
+  session_duration_seconds: number;
 }
 
 /**
@@ -166,6 +170,8 @@ export const DEFAULT_CONFIG: TradingFabricConfig = {
   max_position_usd: 25,
   instrument_allowlist: [],
   execution_chain: 'base-sepolia',
+  session_max_value_usd: 50,
+  session_duration_seconds: 86_400,
 };
 
 /**
@@ -219,6 +225,14 @@ const ENV_OVERRIDES: Record<string, EnvOverride<any>> = {
   TRADING_FABRIC_MAX_POSITION_USD: {
     key: 'max_position_usd',
     parse: (v) => Math.max(0, parseFloat(v)),
+  },
+  TRADING_FABRIC_SESSION_MAX_VALUE_USD: {
+    key: 'session_max_value_usd',
+    parse: (v) => Math.max(0, parseFloat(v)),
+  },
+  TRADING_FABRIC_SESSION_DURATION_SECONDS: {
+    key: 'session_duration_seconds',
+    parse: (v) => Math.max(1, parseInt(v, 10)),
   },
   TRADING_FABRIC_DATA_DIR: { key: 'data_dir', parse: (v) => v },
   TRADING_FABRIC_RESULTS_DIR: { key: 'results_dir', parse: (v) => v },

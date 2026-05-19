@@ -1,0 +1,46 @@
+name: trading-fabric
+
+services:
+  trading-fabric:
+    image: oven/bun:1.2.21
+    working_dir: /workspace
+    user: "${UID:-1000}:${GID:-1000}"
+    env_file:
+      - .env
+    environment:
+      TRADING_FABRIC_DATA_DIR: /data/runtime
+      TRADING_FABRIC_RESULTS_DIR: /data/results
+      TRADING_FABRIC_LLM_PROVIDER: ${TRADING_FABRIC_LLM_PROVIDER:-openai}
+      TRADING_FABRIC_EXECUTE: ${TRADING_FABRIC_EXECUTE:-false}
+    volumes:
+      - .:/workspace
+      - trading_fabric_data:/data
+    command:
+      - sh
+      - -lc
+      - bun install --frozen-lockfile && bun run build && node dist/cli/index.js eval run all
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  ollama:
+    image: ollama/ollama:0.6.8
+    profiles:
+      - ollama
+    expose:
+      - "11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  trading_fabric_data:
+  ollama_models:

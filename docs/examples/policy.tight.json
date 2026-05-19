@@ -1,0 +1,7 @@
+{
+  "limits": {
+    "daily_spend_cap_usd": 5,
+    "max_position_usd": 25,
+    "instrument_allowlist": ["AAPL", "SPY", "BTC-USD"]
+  }
+}
